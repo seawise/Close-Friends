@@ -1,6 +1,7 @@
 <?
 include("facebook/facebook.php");
 error_reporting (E_ALL ^ E_NOTICE);
+set_time_limit(0);
 
 function pr ($string) {
 	print("<pre>");
@@ -58,21 +59,26 @@ else {
 			$friends = array();
 			$criteriaPoints = array();
 			
-			$data = $facebook->api(array(
-				"method" => "fql.multiquery",
-				"queries" => '{
-					"friends": "SELECT uid2 FROM friend WHERE uid1=' . $fbUID .  '",
-					"feed": "SELECT actor_id FROM stream WHERE source_id=' . $fbUID .  ' AND actor_id!=' . $fbUID .  ' LIMIT 100",
-					"fan": "SELECT page_id FROM page_fan WHERE uid=' . $fbUID .  '",
-					"mutualfans": "SELECT uid FROM page_fan WHERE page_id IN (SELECT page_id FROM #fan) AND uid IN (SELECT uid2 FROM #friends)",
-					"likes": "SELECT object_id, post_id FROM like WHERE user_id=' . $fbUID .  '",
-					"mutuallikes": "SELECT user_id FROM like WHERE object_id IN (SELECT object_id FROM #likes) AND user_id IN (SELECT uid2 FROM #friends)",
-					"mutualfriends": "SELECT uid1,uid2 FROM friend WHERE uid1 IN (SELECT uid2 FROM #friends) and uid2 IN (SELECT uid2 from #friends)",
-					"photos": "SELECT pid FROM photo_tag WHERE subject=' . $fbUID .  '",
-					"mutualphotos": "SELECT subject FROM photo_tag WHERE pid IN (SELECT pid FROM #photos) AND subject IN (SELECT uid2 FROM #friends)",
-					"profiles": "SELECT uid, first_name, last_name, pic_square, birthday_date, sex, current_location, hometown_location, education_history FROM user WHERE uid=' . $fbUID . ' OR uid IN (SELECT uid2 FROM #friends)"
-				}'
-			));
+			try {
+				$data = $facebook->api(array(
+					"method" => "fql.multiquery",
+					"queries" => '{
+						"friends": "SELECT uid2 FROM friend WHERE uid1=' . $fbUID .  '",
+						"feed": "SELECT actor_id FROM stream WHERE source_id=' . $fbUID .  ' AND actor_id!=' . $fbUID .  ' LIMIT 100",
+						"fan": "SELECT page_id FROM page_fan WHERE uid=' . $fbUID .  '",
+						"mutualfans": "SELECT uid FROM page_fan WHERE page_id IN (SELECT page_id FROM #fan) AND uid IN (SELECT uid2 FROM #friends)",
+						"likes": "SELECT object_id, post_id FROM like WHERE user_id=' . $fbUID .  '",
+						"mutuallikes": "SELECT user_id FROM like WHERE object_id IN (SELECT object_id FROM #likes) AND user_id IN (SELECT uid2 FROM #friends)",
+						"mutualfriends": "SELECT uid1,uid2 FROM friend WHERE uid1 IN (SELECT uid2 FROM #friends) and uid2 IN (SELECT uid2 from #friends)",
+						"photos": "SELECT pid FROM photo_tag WHERE subject=' . $fbUID .  '",
+						"mutualphotos": "SELECT subject FROM photo_tag WHERE pid IN (SELECT pid FROM #photos) AND subject IN (SELECT uid2 FROM #friends)",
+						"profiles": "SELECT uid, first_name, last_name, pic_square, birthday_date, sex, current_location, hometown_location, education_history FROM user WHERE uid=' . $fbUID . ' OR uid IN (SELECT uid2 FROM #friends)"
+					}'
+				));
+			}
+			catch (FacebookApiException $e) {
+				die ("Facebook API unreachable: " . $e->__toString());
+			}
 			
 			// setting user
 			$fbUser = $data[9]["fql_result_set"][0];
@@ -169,13 +175,18 @@ else {
 				$i++;
 			}
 			
-			$posts = array();
-			foreach ($queries as $key => $query) {
-				$item = $facebook->api(array(
-					"method" => "fql.multiquery",
-					"queries" => json_encode($query)
-				));
-				$posts = array_merge($posts, $item);
+			try {
+				$posts = array();
+				foreach ($queries as $key => $query) {
+					$item = $facebook->api(array(
+						"method" => "fql.multiquery",
+						"queries" => json_encode($query)
+					));
+					$posts = array_merge($posts, $item);
+				}
+			}
+			catch (FacebookApiException $e) {
+				die ("Unable to fetch Facebook API: " . $e->__toString());
 			}
 			
 			$criteria["communication"] = array();
